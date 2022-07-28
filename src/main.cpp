@@ -685,36 +685,27 @@ void AddCube(std::vector<Cubes>& world, SSBOArrays& ssbo, Cubes obj)
 	ssbo.ColorsArray.push_back(obj.color);
 }
 
-void UpdateInstanceBuffer(SSBOIDs bufferIDs, SSBOArrays bufferArrays)
+template<typename T>
+void UpdateSSBO(GLuint id, const std::vector<T>& data)
 {
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferIDs.matrixBuffer);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, id);
 
-	if (bufferArrays.MatrixArray.size() == ssboSize)
+	if (data.size() == ssboSize)
 	{
 		ssboSize += ssboSize; // double ssbo size
-		glBufferData(GL_SHADER_STORAGE_BUFFER, ssboSize * sizeof(glm::mat4), bufferArrays.MatrixArray.data(), GL_DYNAMIC_DRAW);
-		std::cout << "resized model matrix ssbo!" << std::endl;
+		glBufferData(GL_SHADER_STORAGE_BUFFER, ssboSize * sizeof(T), data.data(), GL_DYNAMIC_DRAW);
 	}
 	else
 	{
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, bufferArrays.MatrixArray.size() * sizeof(glm::mat4), bufferArrays.MatrixArray.data());
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, data.size() * sizeof(data[0]), data.data());
 	}
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
 
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, bufferIDs.colorsBuffer);
-
-	if (bufferArrays.ColorsArray.size() == ssboSize)
-	{
-		ssboSize += ssboSize; // double ssbo size
-		glBufferData(GL_SHADER_STORAGE_BUFFER, ssboSize * sizeof(glm::mat4), bufferArrays.ColorsArray.data(), GL_DYNAMIC_DRAW);
-		std::cout << "resized model matrix ssbo!" << std::endl;
-	}
-	else
-	{
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, bufferArrays.ColorsArray.size() * sizeof(glm::vec3), bufferArrays.ColorsArray.data());
-	}
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+void UpdateInstanceBuffer(const SSBOIDs bufferIDs, const SSBOArrays bufferArrays)
+{
+	UpdateSSBO(bufferIDs.matrixBuffer, bufferArrays.MatrixArray);
+	UpdateSSBO(bufferIDs.colorsBuffer, bufferArrays.ColorsArray);
 }
 
 void RotateAround2D(glm::vec2 inPos, float inRadius, float inAngle, glm::vec2& outPos)
