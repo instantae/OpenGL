@@ -548,6 +548,7 @@ int main(void)
 
 			ImGui::SliderFloat3("lightpos", &pos.x, -100.0f, 100.0f);
 			light.position = pos;
+			ImGui::SliderFloat4("lightcolor", &light.color.x, 0.0, 1.0);
 
 			ImGui::SliderFloat2("Rotate around", &rotateAround.x, -100.0f, 100.0f);
 			

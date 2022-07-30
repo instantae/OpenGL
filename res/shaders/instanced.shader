@@ -80,6 +80,6 @@ void main()
 	float spec = pow(max(dot(viewDir, reflectDir), 0.0), u_specularshininess);
 	vec3 specular = u_specularstrength * spec * LightColorNoAlpha;
 
-	vec4 result = vec4(ambient + diffuse + specular, 1.0) * Color;
+	vec4 result = vec4(ambient + diffuse + specular, u_LightColor.a) * Color;
 	out_color = result;
 };
