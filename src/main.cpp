@@ -1,29 +1,10 @@
-// OpenGL functionality
-#include <glad.h>
-#include <GLFW/glfw3.h>
-
-//GLM
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/euler_angles.hpp>
-#include <glm/gtc/matrix_access.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
-// Standard Library
-#include <iostream>
-#include <cstdlib>
-#include <vector>
-#include <chrono>
-
-// ImGui
-#include "vendor/imgui/imgui.h"
-#include "vendor/imgui/imgui_impl_glfw.h"
-#include "vendor/imgui/imgui_impl_opengl3.h"
+#include "common_includes.h"
 
 // Internal headers
 #include "renderer.h"
 #include "VertexBufferLayout.h"
 #include "Texture.h"
+#include "Cubes.h"
 
 float deltaTime = 0, lastFrame = 0;
 
@@ -31,7 +12,6 @@ long ssboSize = 1000000;
 
 glm::vec3 cameraPos(50.0f, -40.0f, 60.0f);
 float pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
-
 
 struct SSBOIDs
 {
@@ -42,39 +22,6 @@ struct SSBOArrays
 {
 	std::vector<glm::mat4> MatrixArray;
 	std::vector<glm::vec4> ColorsArray;
-};
-
-struct Cubes
-{
-	Cubes()
-	{
-	}
-
-	Cubes(glm::vec3 pos, glm::vec3 scale, glm::vec3 rot, glm::vec4 rgba) : position(pos), scale(scale), rotation(rot), color(rgba)
-	{
-		this->calcMatrix();
-	}
-
-	glm::vec3 position = glm::vec3(0, 0, 0);
-	glm::vec3 scale = glm::vec3(1, 1, 1);
-	glm::vec3 rotation = glm::vec3(0, 0, 0);
-	glm::vec4 color = glm::vec4(1.0);
-
-	glm::mat4 modelMatrix = glm::mat4(1.0f);
-
-
-	glm::vec3 const GetPosition() { return position; }
-
-	void calcMatrix()
-	{
-		glm::mat4 mat = glm::translate(glm::mat4(1.0f), position);
-		mat = glm::rotate(mat, rotation.x, glm::vec3(1.0, 0.0, 0.0));
-		mat = glm::rotate(mat, rotation.y, glm::vec3(0.0, 1.0, 0.0));
-		mat = glm::rotate(mat, rotation.z, glm::vec3(0.0, 0.0, 1.0));
-		mat = glm::scale(mat, scale);
-
-		this->modelMatrix = mat;
-	}
 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
