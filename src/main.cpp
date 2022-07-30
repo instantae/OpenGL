@@ -5,6 +5,7 @@
 #include "VertexBufferLayout.h"
 #include "Texture.h"
 #include "Cubes.h"
+#include "cube_verts.h"
 
 float deltaTime = 0, lastFrame = 0;
 
@@ -100,81 +101,11 @@ int main(void)
 		ImGui_ImplOpenGL3_Init(glsl_version);
 	}
 
-	// 2D square vertices (needs indices)
-	float pos[] = {
-		-0.5f, -0.5f, 0.0f, 0.0f,
-		 0.5f, -0.5f, 1.0f, 0.0f,
-		 0.5f,  0.5f, 1.0f, 1.0f,
-		-0.5f,  0.5f, 0.0f, 1.0f
-	};
-
-	GLuint indices[] = {
-		0, 1, 2,
-		2, 3, 0
-	};
-
-	float cubePos[] = {
-	-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-
-	-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-	 0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-	 0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-
-	-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-	-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-	-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-	-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-
-	 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-	 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-	 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-	 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-	 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-
-	-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-	 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-	 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-	 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-	-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-	-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-
-	-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-	 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-	 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-	 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-	-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-	-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
-	};
-
 	GLCall(glEnable(GL_BLEND));
 	GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 	GLCall(glEnable(GL_DEPTH_TEST));
 	//GLCall(glEnable(GL_CULL_FACE));
 	GLCall(glEnable(GL_MULTISAMPLE));
-
-	/*VertexArray vao;
-	VertexBuffer vbo(cubePos, 36 * sizeof(float));
-
-	VertexBufferLayout layout;
-	layout.Push<GLfloat>(3);
-	layout.Push<GLfloat>(2);
-	vao.AddBuffer(vbo, layout);
-
-	IndexBuffer ibo(indices, 6);*/
-
-	// CTRL+K+C to comment selection
-	// CTRL+K+U to uncomment selection
 
 	GLuint VBO, VAO;
 	glGenVertexArrays(1, &VAO);
@@ -299,42 +230,36 @@ int main(void)
 
 	// Variables declared before main loop
 	float increment = 0.05f;
-
 	bool isWireframe = false;
 
 	// ImGui stuff
-	bool show_demo_window = true;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	ImGuiIO& io = ImGui::GetIO();
 
 	int input = 0;
-
 	float angle = 0.0f, radius = 10.0f, speed = 1.0f;
-
 	bool rotateAroundXY = true, rotateAroundXZ = false, rotateAroundYZ = false, paused = false, reverse = false;
-
 	bool mouseMovement;
-
 	glm::vec3 savedPosition;
-
 	float specularStrength = 0.5, specularShininess = 32;
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
 	{
-		renderer.Clear();
+		// Frame reset stuff
+		{
+			renderer.Clear();
 
-		ImGuiIO& io = ImGui::GetIO();
+			float currentFrame = glfwGetTime();
+			deltaTime = currentFrame - lastFrame;
+			lastFrame = currentFrame;
 
-		float currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
+			processInput(window, io);
 
-		processInput(window, io);
-
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+		}
 
 		// Set view and projection matrices through Uniform buffers
 		{
@@ -345,7 +270,6 @@ int main(void)
 			}
 			else
 			{
-				
 				mouseMovement = true;
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 			}
@@ -358,13 +282,12 @@ int main(void)
 				pitch = 89.0f;
 			if (pitch < -89.0f)
 				pitch = -89.0f;
-			}
-
 			fov -= 2 * io.MouseWheel;
 			if (fov < 1.0f)
 				fov = 1.0f;
 			if (fov > 90.0f)
 				fov = 90.0f;
+			}
 
 			projectionMatrix = glm::perspective(glm::radians(fov), windowWidth / windowHeight, 0.1f, 200.0f);
 			glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
@@ -475,8 +398,6 @@ int main(void)
 		instanceShader.Unbind();
 		glBindVertexArray(0);
 		}
-
-		//ImGui::ShowDemoWindow(&show_demo_window);
 
 		// ImGui Window
 		{

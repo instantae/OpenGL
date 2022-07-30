@@ -44,6 +44,7 @@
   <ItemGroup>
     <ClInclude Include="src\common_includes.h" />
     <ClInclude Include="src\Cubes.h" />
+    <ClInclude Include="src\cube_verts.h" />
     <ClInclude Include="src\IndexBuffer.h" />
     <ClInclude Include="src\renderer.h" />
     <ClInclude Include="src\Shader.h" />

@@ -127,6 +127,9 @@
     <ClInclude Include="src\common_includes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\cube_verts.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\textures\blanksquare.png">
