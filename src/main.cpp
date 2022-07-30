@@ -46,7 +46,7 @@ struct SSBOIDs
 struct SSBOArrays
 {
 	std::vector<glm::mat4> MatrixArray;
-	std::vector<glm::vec3> ColorsArray;
+	std::vector<glm::vec4> ColorsArray;
 };
 
 struct Cubes
@@ -55,7 +55,7 @@ struct Cubes
 	{
 	}
 
-	Cubes(glm::vec3 pos, glm::vec3 scale, glm::vec3 rot, glm::vec3 rgba) : position(pos), scale(scale), rotation(rot), color(rgba)
+	Cubes(glm::vec3 pos, glm::vec3 scale, glm::vec3 rot, glm::vec4 rgba) : position(pos), scale(scale), rotation(rot), color(rgba)
 	{
 		calcMatrix();
 	}
@@ -63,7 +63,7 @@ struct Cubes
 	glm::vec3 position = glm::vec3(0, 0, 0);
 	glm::vec3 scale = glm::vec3(1, 1, 1);
 	glm::vec3 rotation = glm::vec3(0, 0, 0);
-	glm::vec3 color = glm::vec3(1, 1, 1);
+	glm::vec4 color = glm::vec4(1.0);
 
 	glm::mat4 modelMatrix = glm::mat4(1.0f);
 
@@ -253,13 +253,13 @@ int main(void)
 	shader.Unbind();
 
 
-	glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+	glm::vec4 lightColor(1.0f, 1.0f, 1.0f, 1.0f);
 	glm::vec3 lightPos(47.0f, 47.0f, 5.0f);
 
 
 	Shader instanceShader("res/shaders/instanced.shader");
 	instanceShader.Bind();
-	instanceShader.SetUniform3f("u_LightColor", lightColor);
+	instanceShader.SetUniform4f("u_LightColor", lightColor);
 	instanceShader.SetUniform3f("u_lightpos", lightPos);
 	instanceShader.Unbind();
 
@@ -267,7 +267,7 @@ int main(void)
 
 
 	lightsourceShader.Bind();
-	lightsourceShader.SetUniform3f("u_LightColor", lightColor);
+	lightsourceShader.SetUniform4f("u_LightColor", lightColor);
 	lightsourceShader.Unbind();
 
 
@@ -367,13 +367,20 @@ int main(void)
 	
 		glm::vec3 boxPos(47.0f, 47.0f, 2.0f);
 	{
-		AddCube(World, SSBO, Cubes(boxPos, glm::vec3(3.0), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0, 0.0, 0.37)));
+		AddCube(World, SSBO, Cubes(boxPos, glm::vec3(3.0), glm::vec3(0.0f), glm::vec4(1.0, 0.0, 0.37, 1.0)));
 	}
+
+	AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+	AddCube(World, SSBO, Cubes(glm::vec3(99.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+	AddCube(World, SSBO, Cubes(glm::vec3(99.0f, 99.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+	AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 99.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+
+
+	UpdateInstanceBuffer(BufferIDs, SSBO);
 
 	Cubes light(lightPos, glm::vec3(0.5), glm::vec3(1.0), lightColor);
 	light.calcMatrix();
 
-	UpdateInstanceBuffer(BufferIDs, SSBO);
 
 	float angle = 0.0f, radius = 10.0f, speed = 1.0f;
 
@@ -423,7 +430,7 @@ int main(void)
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
 
 
-		float radPitch = glm::radians(pitch), radYaw = glm::radians(yaw), radRoll = glm::radians(roll);
+		float radPitch = glm::radians(-pitch), radYaw = glm::radians(yaw), radRoll = glm::radians(roll);
 
 		glm::mat4 rotationMatrix = glm::eulerAngleYXZ(radYaw, radPitch, radRoll);
 		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), -cameraPos);
@@ -504,6 +511,7 @@ int main(void)
 		lightsourceShader.SetUniformMat4f("u_ModelMatrix", modelMatrix);
 		lightsourceShader.SetUniformMat4f("u_ViewMatrix", viewMatrix);
 		lightsourceShader.SetUniformMat4f("u_ProjectionMatrix", projectionMatrix);
+		instanceShader.SetUniform4f("u_LightColor", light.color);
 			
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		lightsourceShader.Unbind();
@@ -515,6 +523,7 @@ int main(void)
 		instanceShader.Bind();
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, BufferIDs.colorsBuffer);
 		instanceShader.SetUniform3f("u_lightpos", light.GetPosition());
+		instanceShader.SetUniform4f("u_LightColor", light.color);
 		instanceShader.SetUniform3f("u_viewpos", cameraPos);
 		instanceShader.SetUniform1f("u_specularstrength", specularStrength);
 		instanceShader.SetUniform1f("u_specularshininess", specularShininess);
@@ -581,7 +590,7 @@ int main(void)
 
 			if (ImGui::Button("Add Cube"))
 			{
-				AddCube(World, SSBO, Cubes(glm::vec3(rand() % 99, rand() % 99, 1.0f), glm::vec3(1.0, 1.0, 1.0), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0, 1.0)));
+				AddCube(World, SSBO, Cubes(glm::vec3(rand() % 99, rand() % 99, 1.0f), glm::vec3(1.0, 1.0, 1.0), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(1.0, 1.0, 1.0, 1.0)));
 				UpdateInstanceBuffer(BufferIDs, SSBO);
 			}
 
@@ -591,7 +600,7 @@ int main(void)
 			{
 				for (int i = 0; i <= input; i++)
 				{
-					AddCube(World, SSBO, Cubes(glm::vec3(rand() % 99, rand() % 99, 1.0f), glm::vec3(1.0, 1.0, 1.0), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0, 1.0)));
+					AddCube(World, SSBO, Cubes(glm::vec3(rand() % 99, rand() % 99, 1.0f), glm::vec3(1.0, 1.0, 1.0), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(1.0, 0.0, 1.0, 1.0)));
 				}
 				UpdateInstanceBuffer(BufferIDs, SSBO);
 			}
