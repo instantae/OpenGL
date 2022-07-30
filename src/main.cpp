@@ -27,7 +27,8 @@ float deltaTime = 0, lastFrame = 0;
 
 long ssboSize = 1000000;
 
-glm::vec3 cameraPos(50.0f, 50.0f, 100.0f);
+glm::vec3 cameraPos(50.0f, -40.0f, 60.0f);
+float pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 
 
 void processInput(GLFWwindow* window, ImGuiIO& io); // forward declare
@@ -81,6 +82,11 @@ struct Cubes
 		this->modelMatrix = mat;
 	}
 };
+
+long long GetMilli()
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
 
 
 void AddCube(std::vector<Cubes>& world, SSBOArrays& ssbo, Cubes obj);
@@ -277,19 +283,26 @@ int main(void)
 	glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 200.0f);
 	glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0f), viewTrans);
 
-
 	std::vector<Cubes> World;
 	SSBOArrays SSBO;
-
-
-	/*{
-		Cubes plane(glm::vec3(49.0f, 49.0f, 0.0f), glm::vec3(100.0f, 100.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.5f, 0.5f, 0.5f, 1.0f));
-
-		World.push_back(plane);
-		SSBO.MatrixArray.push_back(plane.modelMatrix);
-		SSBO.ColorsArray.push_back(plane.color);
-	}*/
 	
+	glm::vec3 boxPos(47.0f, 47.0f, 2.0f);
+	{
+		// Plane
+		AddCube(World, SSBO, Cubes(glm::vec3(50.0f, 50.0f, 0.5f), glm::vec3(101.0f, 101.0f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec4(0.5f, 0.5f, 0.5f, 1.0f)));
+		
+		// Central box
+		AddCube(World, SSBO, Cubes(boxPos, glm::vec3(3.0), glm::vec3(0.0f), glm::vec4(1.0, 0.0, 0.37, 1.0)));
+
+		// Corner boxes
+		AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+		AddCube(World, SSBO, Cubes(glm::vec3(100.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+		AddCube(World, SSBO, Cubes(glm::vec3(100.0f, 100.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+		AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 100.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
+	}
+	
+	Cubes light(lightPos, glm::vec3(0.5), glm::vec3(1.0), lightColor);
+	light.calcMatrix();
 
 	Renderer renderer;
 
@@ -301,18 +314,7 @@ int main(void)
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
-	float increment = 0.05f;
-
-	bool isWireframe = false;
-
-	// ImGui stuff
-	bool show_demo_window = true;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-	float pitch = -0.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
-
-	int input = 0;
-
+	
 	SSBOIDs BufferIDs;
 
 	// SSBO - Matrices
@@ -322,7 +324,6 @@ int main(void)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, BufferIDs.matrixBuffer);
 	
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, SSBO.MatrixArray.size() * sizeof(glm::mat4), SSBO.MatrixArray.data());
-	
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 	// SSBO - Colors
@@ -332,55 +333,50 @@ int main(void)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, BufferIDs.colorsBuffer);
 
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, SSBO.ColorsArray.size() * sizeof(glm::mat4), SSBO.ColorsArray.data());
-
-
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-
-	// UBO stuff
-	GLuint uboMatrices;
-	glGenBuffers(1, &uboMatrices);
-
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_DYNAMIC_DRAW);
-
-	glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
-
-	projectionMatrix = glm::perspective(glm::radians(fov), 1280.0f / 720.0f, 0.1f, 200.0f);
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
-
-
-	glm::mat4 rotationMatrix = glm::eulerAngleYXZ(0, 0, 0);
-	glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), cameraPos);
-
-	viewMatrix = rotationMatrix * translationMatrix;
-
-	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(viewMatrix));
-	glBindBufferBase(GL_UNIFORM_BUFFER, 1, uboMatrices);
-
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-	srand(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
-	
-	
-		glm::vec3 boxPos(47.0f, 47.0f, 2.0f);
-	{
-		AddCube(World, SSBO, Cubes(boxPos, glm::vec3(3.0), glm::vec3(0.0f), glm::vec4(1.0, 0.0, 0.37, 1.0)));
-	}
-
-	AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
-	AddCube(World, SSBO, Cubes(glm::vec3(99.0f, 0.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
-	AddCube(World, SSBO, Cubes(glm::vec3(99.0f, 99.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
-	AddCube(World, SSBO, Cubes(glm::vec3(0.0f, 99.0f, 1.0f), glm::vec3(1.0), glm::vec3(0.0), glm::vec4(1.0)));
-
 
 	UpdateInstanceBuffer(BufferIDs, SSBO);
 
-	Cubes light(lightPos, glm::vec3(0.5), glm::vec3(1.0), lightColor);
-	light.calcMatrix();
+	// UBO stuff
+	GLuint uboMatrices;
+	{
+		glGenBuffers(1, &uboMatrices);
 
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+		glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_DYNAMIC_DRAW);
+
+		glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
+
+		projectionMatrix = glm::perspective(glm::radians(fov), 1280.0f / 720.0f, 0.1f, 200.0f);
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
+
+
+		glm::mat4 rotationMatrix = glm::eulerAngleYXZ(0, 0, 0);
+		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), cameraPos);
+
+		viewMatrix = rotationMatrix * translationMatrix;
+
+		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(viewMatrix));
+		glBindBufferBase(GL_UNIFORM_BUFFER, 1, uboMatrices);
+
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	}
+
+	srand(GetMilli()); // setting rand() seed to ms since epoch
+
+
+	// Variables declared before main loop
+	float increment = 0.05f;
+
+	bool isWireframe = false;
+
+	// ImGui stuff
+	bool show_demo_window = true;
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+	int input = 0;
 
 	float angle = 0.0f, radius = 10.0f, speed = 1.0f;
 
@@ -389,7 +385,6 @@ int main(void)
 	glm::vec3 savedPosition;
 
 	float specularStrength = 0.5, specularShininess = 32;
-
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
@@ -619,22 +614,15 @@ int main(void)
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
-
 		/* Poll for and process events */
 		glfwPollEvents();
 	}
 
-	glfwDestroyWindow(window);
-
-
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-
-
 	return 0;
 }
 
@@ -646,10 +634,10 @@ void processInput(GLFWwindow* window, ImGuiIO& io)
 		glfwSetWindowShouldClose(window, true);
 
 	/*if (ImGui::IsKeyDown(ImGuiKey_W))
-		cameraPos += cameraSpeed;
+		cameraPos += cameraSpeed * cameraFront;
 
 	if (ImGui::IsKeyDown(ImGuiKey_S))
-		cameraPos -= cameraSpeed;
+		cameraPos -= cameraSpeed * cameraFront;
 
 	if (ImGui::IsKeyDown(ImGuiKey_A))
 		cameraPos -= cameraSpeed * glm::normalize(glm::cross(cameraFront, cameraUp));
