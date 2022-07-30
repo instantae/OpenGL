@@ -1,9 +1,13 @@
 // OpenGL functionality
 #include <glad.h>
 #include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 #include <iostream>
 #include <cstdlib>
@@ -23,9 +27,7 @@ float deltaTime = 0, lastFrame = 0;
 
 long ssboSize = 1000000;
 
-glm::vec3 cameraPos(55.0f, 25.0f, 30.0f);
-glm::vec3 cameraFront(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);
+glm::vec3 cameraPos(50.0f, 50.0f, 100.0f);
 
 
 void processInput(GLFWwindow* window, ImGuiIO& io); // forward declare
@@ -98,6 +100,7 @@ int main(void)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SAMPLES, 4);
 
 	GLFWmonitor* monitor = glfwGetPrimaryMonitor();
 	const GLFWvidmode* vidmode = glfwGetVideoMode(monitor);
@@ -202,6 +205,8 @@ int main(void)
 	GLCall(glEnable(GL_BLEND));
 	GLCall(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 	GLCall(glEnable(GL_DEPTH_TEST));
+	//GLCall(glEnable(GL_CULL_FACE));
+	GLCall(glEnable(GL_MULTISAMPLE));
 
 	/*VertexArray vao;
 	VertexBuffer vbo(cubePos, 36 * sizeof(float));
@@ -304,7 +309,7 @@ int main(void)
 	bool show_demo_window = true;
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	float pitch = -35.0f, yaw = -90.0f, fov = 45.0f;
+	float pitch = -0.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 
 	int input = 0;
 
@@ -345,7 +350,12 @@ int main(void)
 	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
 
-	viewMatrix = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
+	glm::mat4 rotationMatrix = glm::eulerAngleYXZ(0, 0, 0);
+	glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), cameraPos);
+
+	viewMatrix = rotationMatrix * translationMatrix;
+
 	glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 	glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(viewMatrix));
 	glBindBufferBase(GL_UNIFORM_BUFFER, 1, uboMatrices);
@@ -400,12 +410,6 @@ int main(void)
 		if (pitch < -89.0f)
 			pitch = -89.0f;*/
 
-		/*glm::vec3 direction;
-		direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-		direction.y = sin(glm::radians(pitch));
-		direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-		cameraFront = glm::normalize(direction);*/
-
 
 		fov -= 2 * io.MouseWheel;
 		if (fov < 1.0f)
@@ -414,30 +418,28 @@ int main(void)
 			fov = 90.0f;
 
 
-		glm::vec3 direction = cameraFront;
-		direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-		direction.y = -sin(glm::radians(pitch));
-		direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-		cameraFront = glm::normalize(direction);
-
 		projectionMatrix = glm::perspective(glm::radians(fov), 1280.0f / 720.0f, 0.1f, 200.0f);
 		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
 
-		viewMatrix = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
+		float radPitch = glm::radians(pitch), radYaw = glm::radians(yaw), radRoll = glm::radians(roll);
+
+		glm::mat4 rotationMatrix = glm::eulerAngleYXZ(radYaw, radPitch, radRoll);
+		glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), -cameraPos);
+
+		viewMatrix = rotationMatrix * translationMatrix;
+
+
 		glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 		glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(viewMatrix));
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 		glBindVertexArray(VAO);
-		//gradually orbit light around y axis
 		
-		
-
 		glm::vec3 pos;
 		glm::vec2 newPos;
 		glm::vec2 rotateAround;
-		
 		// light box rotation behavior
 		{
 			if (angle > 360.0f)
@@ -502,7 +504,6 @@ int main(void)
 		lightsourceShader.SetUniformMat4f("u_ModelMatrix", modelMatrix);
 		lightsourceShader.SetUniformMat4f("u_ViewMatrix", viewMatrix);
 		lightsourceShader.SetUniformMat4f("u_ProjectionMatrix", projectionMatrix);
-		
 			
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		lightsourceShader.Unbind();
@@ -520,26 +521,9 @@ int main(void)
 
 		UpdateInstanceBuffer(BufferIDs, SSBO);
 
-
 		glDrawArraysInstanced(GL_TRIANGLES, 0, 36, SSBO.MatrixArray.size());
 		instanceShader.Unbind();
 		glBindVertexArray(0);
-
-		//{
-		//	glm::mat4 modelMatrix = glm::translate(glm::mat4(1.0f), translationA);
-		//	modelMatrix = glm::rotate(modelMatrix, glm::radians(rotA), glm::vec3(0.0, 1.0, 0.0));
-
-		//	viewMatrix = glm::scale(viewMatrix, glm::vec3(scale));
-
-		//	glm::mat4 mvp = projectionMatrix * viewMatrix * modelMatrix;
-
-		//	shader.Bind();
-		//	shader.SetUniform4f("u_Color", u_Color);
-		//	shader.SetUniformMat4f("u_MVP", mvp);
-		//	//renderer.Draw(vao, ibo, shader);
-
-		//	glDrawArrays(GL_TRIANGLES, 0, 36);
-		//}
 
 
 		//ImGui::ShowDemoWindow(&show_demo_window);
@@ -548,8 +532,9 @@ int main(void)
 			ImGui::Begin(" ");
 
 			ImGui::SliderFloat3("cameraPosition", &cameraPos.x, -100.0f, 200.0f);
-			ImGui::SliderFloat("Pitch", &pitch, -89.0f, 89.0f);
+			ImGui::SliderFloat("Pitch", &pitch, -180.0f, 180.0f);
 			ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f);
+			ImGui::SliderFloat("Roll", &roll, -180.0f, 180.0f);
 
 
 			ImGui::SliderFloat3("lightpos", &pos.x, -100.0f, 100.0f);
@@ -616,20 +601,6 @@ int main(void)
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::End();
 		}
-		
-
-		/*{
-			ImGui::Begin("world object tracker");
-
-			for (int i = 0; i < World.size(); i++)
-			{
-				ImGui::Text("Cube %i at x=%f, y=%f, z=%f", i, World[i].position.x, World[i].position.y, World[i].position.z);
-				ImGui::Text("\t rotation: x=%f, y=%f, z=%f", World[i].rotation.x, World[i].rotation.y, World[i].rotation.z);
-				ImGui::Text("\t scale: x=%f, y=%f, z=%f", World[i].scale.x, World[i].scale.y, World[i].scale.z);
-			}
-
-			ImGui::End();
-		}*/
 
 		if (isWireframe)
 			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -665,10 +636,10 @@ void processInput(GLFWwindow* window, ImGuiIO& io)
 		glfwSetWindowShouldClose(window, true);
 
 	/*if (ImGui::IsKeyDown(ImGuiKey_W))
-		cameraPos += cameraSpeed * cameraFront;
+		cameraPos += cameraSpeed;
 
 	if (ImGui::IsKeyDown(ImGuiKey_S))
-		cameraPos -= cameraSpeed * cameraFront;
+		cameraPos -= cameraSpeed;
 
 	if (ImGui::IsKeyDown(ImGuiKey_A))
 		cameraPos -= cameraSpeed * glm::normalize(glm::cross(cameraFront, cameraUp));

@@ -132,8 +132,9 @@ GLuint Shader::CreateShader(const std::string& vertexShader, const std::string& 
 
 GLint Shader::GetUniformLocation(const std::string& name)
 {
-	if (m_UniformLocationCache.find(name) != m_UniformLocationCache.end())
-		return m_UniformLocationCache[name];
+	auto it = m_UniformLocationCache.find(name);
+	if ( it != m_UniformLocationCache.end())
+		return it->second;
 
 	GLCall(GLint location = glGetUniformLocation(m_RendererID, name.c_str()));
 
