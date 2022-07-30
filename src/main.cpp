@@ -12,6 +12,7 @@ long ssboSize = 1000000;
 
 glm::vec3 cameraPos(50.0f, -40.0f, 60.0f);
 float pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
+float windowWidth = 1280, windowHeight = 720;
 
 struct SSBOIDs
 {
@@ -27,6 +28,8 @@ struct SSBOArrays
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
 	glViewport(0, 0, width, height);
+	windowWidth = width;
+	windowHeight = height;
 }
 long long GetMilli()
 {
@@ -55,36 +58,28 @@ int main(void)
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		glfwWindowHint(GLFW_SAMPLES, 4);
 
-		GLFWmonitor* monitor = glfwGetPrimaryMonitor();
-		const GLFWvidmode* vidmode = glfwGetVideoMode(monitor);
-
-		int width_mm, height_mm;
-		glfwGetMonitorPhysicalSize(monitor, &width_mm, &height_mm);
-
-		float xscale, yscale;
-		glfwGetMonitorContentScale(monitor, &xscale, &yscale);
+		const GLFWvidmode* vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
 
 		std::cout << "Monitor: " << vidmode->width << "x" << vidmode->height << " @" << vidmode->refreshRate << "Hz" << std::endl;
 
 		/* Create a windowed mode window and its OpenGL context */
-		window = glfwCreateWindow(1280, 720, "Hello World", NULL, NULL);
+		window = glfwCreateWindow(windowWidth, windowHeight, "Hello World", NULL, NULL);
 		if (!window)
 		{
 			glfwTerminate();
 			return -1;
 		}
 
-		int xpos, ypos;
-		glfwGetWindowPos(window, &xpos, &ypos);
-		std::cout << "window pos: " << xpos << "x" << ypos << std::endl;
+		// center window to screen
+		glfwSetWindowPos(window, (vidmode->width / 2) - windowWidth / 2, (vidmode->height / 2) - windowHeight / 2);
 
 		/* Make the window's context current */
 		glfwMakeContextCurrent(window);
+
 		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 		glfwSwapInterval(1); // VSYNC
-
-		glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+		glfwSetCursorPos(window, 1280 / 2, 720 / 2);
 
 		// Glad
 		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -224,7 +219,7 @@ int main(void)
 
 	glm::vec3 viewTrans(0.0f, 0.0f, 0.0f);
 	//glm::mat4 projectionMatrix = glm::ortho(0.0f, 16.0f, 0.0f, 9.0f, -1.0f, 1.0f);
-	glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 200.0f);
+	glm::mat4 projectionMatrix = glm::perspective(glm::radians(45.0f), windowWidth / windowHeight, 0.1f, 200.0f);
 	glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0f), viewTrans);
 
 	std::vector<Cubes> World;
@@ -317,6 +312,8 @@ int main(void)
 
 	bool rotateAroundXY = true, rotateAroundXZ = false, rotateAroundYZ = false, paused = false, reverse = false;
 
+	bool mouseMovement;
+
 	glm::vec3 savedPosition;
 
 	float specularStrength = 0.5, specularShininess = 32;
@@ -338,23 +335,38 @@ int main(void)
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
 
-		/*yaw += io.MouseDelta.x;
-		pitch += io.MouseDelta.y;
-		if (pitch > 89.0f)
-			pitch = 89.0f;
-		if (pitch < -89.0f)
-			pitch = -89.0f;*/
-
 
 		// Set view and projection matrices through Uniform buffers
 		{
+			if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
+			{
+				mouseMovement = false;
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			}
+			else
+			{
+				
+				mouseMovement = true;
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+			}
+
+			if (mouseMovement)
+			{
+			yaw += io.MouseDelta.x;
+			pitch -= io.MouseDelta.y;
+			if (pitch > 89.0f)
+				pitch = 89.0f;
+			if (pitch < -89.0f)
+				pitch = -89.0f;
+			}
+
 			fov -= 2 * io.MouseWheel;
 			if (fov < 1.0f)
 				fov = 1.0f;
 			if (fov > 90.0f)
 				fov = 90.0f;
 
-			projectionMatrix = glm::perspective(glm::radians(fov), 1280.0f / 720.0f, 0.1f, 200.0f);
+			projectionMatrix = glm::perspective(glm::radians(fov), windowWidth / windowHeight, 0.1f, 200.0f);
 			glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
 
@@ -544,10 +556,18 @@ int main(void)
 				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 			ImGui::Separator();
+			if (ImGui::Button("Reset Window"))
+			{
+				windowWidth = 1280;
+				windowHeight = 720;
+				glViewport(0, 0, windowWidth, windowHeight);
+				glfwSetWindowSize(window, windowWidth, windowHeight);
+				const GLFWvidmode* vidmode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+				glfwSetWindowPos(window, (vidmode->width / 2) - windowWidth / 2, (vidmode->height / 2) - windowHeight / 2);
+			}
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::End();
 		}
-
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
