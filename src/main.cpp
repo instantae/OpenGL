@@ -15,6 +15,10 @@ glm::vec3 cameraPos(50.0f, -40.0f, 60.0f);
 float pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 float windowWidth = 1280, windowHeight = 720;
 
+glm::vec3 forward(0.0, 0.0, -1.0), up(0.0, 1.0, 0.0), left(-1.0, 0.0, 0.0);
+glm::quat quaternion(1, 0, 0, 0);
+
+
 struct SSBOIDs
 {
 	GLuint matrixBuffer;
@@ -38,7 +42,6 @@ long long GetMilli()
 }
 
 // forward declares
-void processInput(GLFWwindow* window, ImGuiIO& io); 
 void AddCube(std::vector<Cubes>& world, SSBOArrays& ssbo, Cubes obj);
 void UpdateInstanceBuffer(SSBOIDs bufferIDs, SSBOArrays bufferArrays);
 void RotateAround2D(glm::vec2 inPos, float inRadius, float inAngle, glm::vec2& outPos);
@@ -239,13 +242,15 @@ int main(void)
 	int input = 0;
 	float angle = 0.0f, radius = 10.0f, speed = 1.0f;
 	bool rotateAroundXY = true, rotateAroundXZ = false, rotateAroundYZ = false, paused = false, reverse = false;
-	bool mouseMovement = false, mouseMovementOverride = true;
+	bool mouseMovement = false, mouseMovementOverride = true, flightMode = true;
 	glm::vec3 savedPosition;
 	float specularStrength = 0.5, specularShininess = 32;
 
 	float pointLight_Constant = 1.0f;
 	float pointLight_Linear = 0.09f;
-	float pointLight_Quadratic = 0.032f;
+	float pointLight_Quadratic = 0.002f;
+	
+	float cameraSpeed = 10.0f;
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
@@ -258,11 +263,34 @@ int main(void)
 			deltaTime = currentFrame - lastFrame;
 			lastFrame = currentFrame;
 
-			processInput(window, io);
-
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+		}
+
+		//Process inputs
+		{
+
+			if (ImGui::IsKeyDown(ImGuiKey_Escape))
+				glfwSetWindowShouldClose(window, true);
+
+			if (ImGui::IsKeyDown(ImGuiKey_W))
+				cameraPos += cameraSpeed * forward;
+
+			if (ImGui::IsKeyDown(ImGuiKey_S))
+				cameraPos -= cameraSpeed * forward;
+
+			if (ImGui::IsKeyDown(ImGuiKey_A))
+				cameraPos -= cameraSpeed * glm::normalize(glm::cross(forward, up));
+
+			if (ImGui::IsKeyDown(ImGuiKey_D))
+				cameraPos += cameraSpeed * glm::normalize(glm::cross(forward, up));
+
+			if (ImGui::IsKeyDown(ImGuiKey_Q))
+				roll += cameraSpeed;
+
+			if (ImGui::IsKeyDown(ImGuiKey_E))
+				roll -= cameraSpeed;
 		}
 
 		// Set view and projection matrices through Uniform buffers
@@ -292,15 +320,59 @@ int main(void)
 					fov = 90.0f;
 			}
 
-			projectionMatrix = glm::perspective(glm::radians(fov), windowWidth / windowHeight, 0.1f, 200.0f);
+			projectionMatrix = glm::perspective(glm::radians(fov), windowWidth / windowHeight, 0.1f, 2000.0f);
 			glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 			glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projectionMatrix));
 
-			float radPitch = glm::radians(-pitch), radYaw = glm::radians(yaw), radRoll = glm::radians(roll);
-			glm::mat4 rotationMatrix = glm::eulerAngleYXZ(radYaw, radPitch, radRoll);
-			glm::mat4 translationMatrix = glm::translate(glm::mat4(1.0f), -cameraPos);
+			float radPitch = glm::radians(pitch), radYaw = glm::radians(yaw), radRoll = glm::radians(roll);
 
-			viewMatrix = rotationMatrix * translationMatrix;
+			if (!flightMode)
+			{
+				quaternion = glm::quat(1.0, 0.0, 0.0, 0.0);
+				forward = glm::vec3(0.0, 0.0, -1);
+				up = glm::vec3(0.0, 1.0, 0.0);
+				left = glm::vec3(-1.0, 0.0, 0.0);
+			}
+
+			{
+				float x = forward.x * sin(radRoll / 2);
+				float y = forward.y * sin(radRoll / 2);
+				float z = forward.z * sin(radRoll / 2);
+				float w = cos(radRoll / 2);
+				glm::quat q = glm::quat(w, x, y, z);
+				quaternion *= q;
+				forward = forward * q;
+				up = up * q;
+				left = left * q;
+			}
+			{
+				float x = left.x * sin(radPitch / 2);
+				float y = left.y * sin(radPitch / 2);
+				float z = left.z * sin(radPitch / 2);
+				float w = cos(radPitch / 2);
+				glm::quat q = glm::quat(w, x, y, z);
+				quaternion *= q;
+				forward = forward * q;
+				up = up * q;
+				left = left * q;
+			}
+			{
+				float x = up.x * sin(radYaw / 2);
+				float y = up.y * sin(radYaw / 2);
+				float z = up.z * sin(radYaw / 2);
+				float w = cos(radYaw / 2);
+				glm::quat q = glm::quat(w, x, y, z);
+				quaternion *= q;
+				forward = forward * q;
+				up = up * q;
+				left = left * q;
+			}
+
+			if (flightMode) { roll = 0; pitch = 0; yaw = 0; }
+			
+
+			viewMatrix = glm::toMat4(quaternion) * glm::translate(glm::mat4(1.0), -cameraPos);
+
 			glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
 			glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(viewMatrix));
 			glBindBuffer(GL_UNIFORM_BUFFER, 0);
@@ -386,25 +458,25 @@ int main(void)
 
 		// Draw instanced objects
 		{
-		glBindVertexArray(VAO);
-		instanceShader.Bind();
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, BufferIDs.colorsBuffer);
+			glBindVertexArray(VAO);
+			instanceShader.Bind();
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, BufferIDs.colorsBuffer);
 		
-		instanceShader.SetUniform3f("u_lightpos", light.GetPosition());
-		instanceShader.SetUniform4f("u_LightColor", light.color);
-		instanceShader.SetUniform1f("u_PointLight_Constant", pointLight_Constant);
-		instanceShader.SetUniform1f("u_PointLight_Linear", pointLight_Linear);
-		instanceShader.SetUniform1f("u_PointLight_Quadratic", pointLight_Quadratic);
+			instanceShader.SetUniform3f("u_lightpos", light.GetPosition());
+			instanceShader.SetUniform4f("u_LightColor", light.color);
+			instanceShader.SetUniform1f("u_PointLight_Constant", pointLight_Constant);
+			instanceShader.SetUniform1f("u_PointLight_Linear", pointLight_Linear);
+			instanceShader.SetUniform1f("u_PointLight_Quadratic", pointLight_Quadratic);
 		
-		instanceShader.SetUniform3f("u_viewpos", cameraPos);
-		instanceShader.SetUniform1f("u_specularstrength", specularStrength);
-		instanceShader.SetUniform1f("u_specularshininess", specularShininess);
+			instanceShader.SetUniform3f("u_viewpos", cameraPos);
+			instanceShader.SetUniform1f("u_specularstrength", specularStrength);
+			instanceShader.SetUniform1f("u_specularshininess", specularShininess);
 
-		UpdateInstanceBuffer(BufferIDs, SSBO);
+			UpdateInstanceBuffer(BufferIDs, SSBO);
 
-		glDrawArraysInstanced(GL_TRIANGLES, 0, 36, SSBO.MatrixArray.size());
-		instanceShader.Unbind();
-		glBindVertexArray(0);
+			glDrawArraysInstanced(GL_TRIANGLES, 0, 36, SSBO.MatrixArray.size());
+			instanceShader.Unbind();
+			glBindVertexArray(0);
 		}
 
 		// ImGui Camera control Window
@@ -412,9 +484,22 @@ int main(void)
 			ImGui::Begin("Camera");
 
 			ImGui::SliderFloat3("cameraPosition", &cameraPos.x, -100.0f, 200.0f);
-			ImGui::SliderFloat("Pitch", &pitch, -180.0f, 180.0f);
-			ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f);
-			ImGui::SliderFloat("Roll", &roll, -180.0f, 180.0f);
+			if (flightMode)
+			{
+				ImGui::Text("Flight Mode");
+				ImGui::SliderFloat("Pitch", &pitch, -2.0f, 2.0f);
+				ImGui::SliderFloat("Yaw", &yaw, -2.0f, 2.0f);
+				ImGui::SliderFloat("Roll", &roll, -2.0f, 2.0f);
+			}
+			else
+			{
+				ImGui::Text("Input Mode (Absolute)");
+				ImGui::SliderFloat("Pitch", &pitch, -180.0f, 180.0f);
+				ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f);
+			}
+
+			ImGui::InputFloat("Camera Speed", &cameraSpeed);
+
 			if (!mouseMovementOverride)
 				ImGui::Text("FOV: %f", fov);
 			else
@@ -422,14 +507,26 @@ int main(void)
 
 			if (ImGui::Button("Reset Camera"))
 			{
+				quaternion = glm::quat(1.0, 0.0, 0.0, 0.0);
+				forward = glm::vec3(0.0, 0.0, -1);
+				up = glm::vec3(0.0, 1.0, 0.0);
+				left = glm::vec3(-1.0, 0.0, 0.0);
 				cameraPos = glm::vec3(50.0f, -40.0f, 60.0f); pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 			} ImGui::SameLine();
 			if (ImGui::Button("Reset Camera (Top-Down)"))
 			{
+				quaternion = glm::quat(1.0, 0.0, 0.0, 0.0);
+				forward = glm::vec3(0.0, 0.0, -1);
+				up = glm::vec3(0.0, 1.0, 0.0);
+				left = glm::vec3(-1.0, 0.0, 0.0);
 				cameraPos = glm::vec3(50.0f, 50.0f, 130.0f); pitch = 0.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 			}
 			
 			ImGui::Checkbox("Mouse movement override", &mouseMovementOverride);
+
+			ImGui::Checkbox("Flight Mode", &flightMode);
+
+			ImGui::Text("Front Vector: %f %f %f", forward.x, forward.y, forward.z);
 
 			ImGui::End();
 		}
@@ -535,27 +632,6 @@ int main(void)
 	ImGui::DestroyContext();
 	return 0;
 }
-
-void processInput(GLFWwindow* window, ImGuiIO& io)
-{
-	float cameraSpeed = 10.0f * deltaTime;
-
-	if (ImGui::IsKeyDown(ImGuiKey_Escape))
-		glfwSetWindowShouldClose(window, true);
-
-	/*if (ImGui::IsKeyDown(ImGuiKey_W))
-		cameraPos += cameraSpeed * cameraFront;
-
-	if (ImGui::IsKeyDown(ImGuiKey_S))
-		cameraPos -= cameraSpeed * cameraFront;
-
-	if (ImGui::IsKeyDown(ImGuiKey_A))
-		cameraPos -= cameraSpeed * glm::normalize(glm::cross(cameraFront, cameraUp));
-
-	if (ImGui::IsKeyDown(ImGuiKey_D))
-		cameraPos += cameraSpeed * glm::normalize(glm::cross(cameraFront, cameraUp));*/
-}
-
 void AddCube(std::vector<Cubes>& world, SSBOArrays& ssbo, Cubes obj)
 {
 	world.push_back(obj);
