@@ -56,6 +56,10 @@ in vec3 FragPos;
 
 uniform vec4 u_LightColor;
 uniform vec3 u_lightpos;
+uniform float u_PointLight_Constant;
+uniform float u_PointLight_Linear;
+uniform float u_PointLight_Quadratic;
+
 uniform vec3 u_viewpos;
 uniform float u_specularstrength;
 uniform float u_specularshininess;
@@ -64,6 +68,7 @@ void main()
 {
 	vec3 LightColorNoAlpha = vec3(u_LightColor.r, u_LightColor.g, u_LightColor.b);
 
+	
 
 	float ambientStrength = 0.1;
 	vec3 ambient = ambientStrength * LightColorNoAlpha;
@@ -79,6 +84,14 @@ void main()
 
 	float spec = pow(max(dot(viewDir, reflectDir), 0.0), u_specularshininess);
 	vec3 specular = u_specularstrength * spec * LightColorNoAlpha;
+
+	float distance = length(u_lightpos - FragPos);
+	float attenuation = 1.0 / (u_PointLight_Constant + u_PointLight_Linear * distance + u_PointLight_Quadratic * (distance * distance));
+
+	ambient *= attenuation * 10;
+	diffuse *= attenuation;
+	specular *= attenuation;
+
 
 	vec4 result = vec4(ambient + diffuse + specular, u_LightColor.a) * Color;
 	out_color = result;

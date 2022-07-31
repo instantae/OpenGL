@@ -239,9 +239,13 @@ int main(void)
 	int input = 0;
 	float angle = 0.0f, radius = 10.0f, speed = 1.0f;
 	bool rotateAroundXY = true, rotateAroundXZ = false, rotateAroundYZ = false, paused = false, reverse = false;
-	bool mouseMovement;
+	bool mouseMovement = false, mouseMovementOverride = true;
 	glm::vec3 savedPosition;
 	float specularStrength = 0.5, specularShininess = 32;
+
+	float pointLight_Constant = 1.0f;
+	float pointLight_Linear = 0.09f;
+	float pointLight_Quadratic = 0.032f;
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
@@ -264,29 +268,28 @@ int main(void)
 		// Set view and projection matrices through Uniform buffers
 		{
 			if (ImGui::IsKeyDown(ImGuiKey_LeftCtrl))
-			{
 				mouseMovement = false;
-				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			}
 			else
-			{
 				mouseMovement = true;
-				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-			}
 
-			if (mouseMovement)
+			if(mouseMovementOverride)
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+
+			if (mouseMovement && !mouseMovementOverride)
 			{
-			yaw += io.MouseDelta.x;
-			pitch -= io.MouseDelta.y;
-			if (pitch > 89.0f)
-				pitch = 89.0f;
-			if (pitch < -89.0f)
-				pitch = -89.0f;
-			fov -= 2 * io.MouseWheel;
-			if (fov < 1.0f)
-				fov = 1.0f;
-			if (fov > 90.0f)
-				fov = 90.0f;
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+				yaw += io.MouseDelta.x;
+				pitch -= io.MouseDelta.y;
+				if (pitch > 89.0f)
+					pitch = 89.0f;
+				if (pitch < -89.0f)
+					pitch = -89.0f;
+				fov -= 2 * io.MouseWheel;
+				if (fov < 1.0f)
+					fov = 1.0f;
+				if (fov > 90.0f)
+					fov = 90.0f;
 			}
 
 			projectionMatrix = glm::perspective(glm::radians(fov), windowWidth / windowHeight, 0.1f, 200.0f);
@@ -386,8 +389,13 @@ int main(void)
 		glBindVertexArray(VAO);
 		instanceShader.Bind();
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, BufferIDs.colorsBuffer);
+		
 		instanceShader.SetUniform3f("u_lightpos", light.GetPosition());
 		instanceShader.SetUniform4f("u_LightColor", light.color);
+		instanceShader.SetUniform1f("u_PointLight_Constant", pointLight_Constant);
+		instanceShader.SetUniform1f("u_PointLight_Linear", pointLight_Linear);
+		instanceShader.SetUniform1f("u_PointLight_Quadratic", pointLight_Quadratic);
+		
 		instanceShader.SetUniform3f("u_viewpos", cameraPos);
 		instanceShader.SetUniform1f("u_specularstrength", specularStrength);
 		instanceShader.SetUniform1f("u_specularshininess", specularShininess);
@@ -399,14 +407,19 @@ int main(void)
 		glBindVertexArray(0);
 		}
 
-		// ImGui Window
+		// ImGui Camera control Window
 		{
-			ImGui::Begin(" ");
+			ImGui::Begin("Camera");
 
 			ImGui::SliderFloat3("cameraPosition", &cameraPos.x, -100.0f, 200.0f);
 			ImGui::SliderFloat("Pitch", &pitch, -180.0f, 180.0f);
 			ImGui::SliderFloat("Yaw", &yaw, -180.0f, 180.0f);
 			ImGui::SliderFloat("Roll", &roll, -180.0f, 180.0f);
+			if (!mouseMovementOverride)
+				ImGui::Text("FOV: %f", fov);
+			else
+				ImGui::SliderFloat("FOV", &fov, 10.0f, 120.0f);
+
 			if (ImGui::Button("Reset Camera"))
 			{
 				cameraPos = glm::vec3(50.0f, -40.0f, 60.0f); pitch = 46.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
@@ -415,26 +428,34 @@ int main(void)
 			{
 				cameraPos = glm::vec3(50.0f, 50.0f, 130.0f); pitch = 0.0f, yaw = 0.0f, roll = 0.0f, fov = 45.0f;
 			}
+			
+			ImGui::Checkbox("Mouse movement override", &mouseMovementOverride);
 
-			ImGui::Separator();
+			ImGui::End();
+		}
+
+		//ImGui light control window
+		{
+			ImGui::Begin("Light");
 			ImGui::SliderFloat3("lightpos", &pos.x, -100.0f, 100.0f);
 			light.position = pos;
 			ImGui::SliderFloat4("lightcolor RGBA", &light.color.x, 0.0, 1.0);
+			ImGui::Separator();
 
 			//ImGui::SliderFloat2("Rotate around", &rotateAround.x, -100.0f, 100.0f);
-			
+
 			if (ImGui::Button("Rotate on X/Y axis"))
 			{
 				rotateAroundXY = true;
 				rotateAroundXZ = false;
 				rotateAroundYZ = false;
-			} ImGui::SameLine(); 
+			} ImGui::SameLine();
 			if (ImGui::Button("Rotate on X/Z axis"))
 			{
 				rotateAroundXY = false;
 				rotateAroundXZ = true;
 				rotateAroundYZ = false;
-			} ImGui::SameLine(); 
+			} ImGui::SameLine();
 			if (ImGui::Button("Rotate on Y/Z axis"))
 			{
 				rotateAroundXY = false;
@@ -442,16 +463,26 @@ int main(void)
 				rotateAroundYZ = true;
 			}
 			ImGui::Checkbox("Freeze in place", &paused); ImGui::SameLine();
-				savedPosition = pos; 
-			ImGui::Checkbox("Reverse rotation", &reverse); 
+			savedPosition = pos;
+			ImGui::Checkbox("Reverse rotation", &reverse);
 			ImGui::SliderFloat("Angle", &angle, 0.0f, 360.0f); ImGui::SliderFloat("Radius", &radius, 0.0f, 55.0f);  ImGui::SliderFloat("Speed", &speed, 0.001f, 20.0f);
 
 			ImGui::Separator();
 			ImGui::SliderFloat("Specular Strength", &specularStrength, 0.001f, 1.0f);
 			ImGui::SliderFloat("Object Shininess", &specularShininess, 0, 256);
-			ImGui::Text("FOV: %f", fov);
 
 			ImGui::Separator();
+			ImGui::Text("Point light attenuation variables");
+			ImGui::SliderFloat("Constant", &pointLight_Constant, 0.0f, 1.0f);
+			ImGui::SliderFloat("Linear", &pointLight_Linear, 0.001f, 0.5f);
+			ImGui::SliderFloat("Quadratic", &pointLight_Quadratic, 0.001f, 0.1f);
+
+			ImGui::End();
+		}
+
+		//ImGui world control window
+		{
+			ImGui::Begin("World Control");
 			ImGui::Text("Number of cubes in world: %i", World.size());
 
 			if (ImGui::Button("Add 1 Cube"))
@@ -468,7 +499,7 @@ int main(void)
 				}
 				UpdateInstanceBuffer(BufferIDs, SSBO);
 			}
-			
+
 			ImGui::Separator();
 			ImGui::Checkbox("Wireframe mode", &isWireframe);
 			if (isWireframe)
@@ -487,6 +518,7 @@ int main(void)
 				glfwSetWindowPos(window, (vidmode->width / 2) - windowWidth / 2, (vidmode->height / 2) - windowHeight / 2);
 			}
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			
 			ImGui::End();
 		}
 
