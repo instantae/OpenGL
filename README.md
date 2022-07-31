@@ -4,10 +4,10 @@ An OpenGL project
 
 
 ### Version 31_07_2022:
-> -batch rendering through SSBO instacing
+> - batch rendering through SSBO instacing
 >
-> -ImGui interface
+> - ImGui interface
 >
-> -quaternion based camera 
+> - quaternion based camera 
 >
-> -phong lighting model
+> - phong lighting model
